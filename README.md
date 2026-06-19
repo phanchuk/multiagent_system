@@ -168,7 +168,9 @@ The workflow supports:
 
 ---
 ### User Intent Clarification
-<img width="1099" height="533" alt="Deep Research Agents 2 - Intent" src="https://github.com/user-attachments/assets/586f58cd-3b3f-4a69-b765-9aa7c8583b61" />
+
+<img width="959" height="440" alt="intent" src="https://github.com/user-attachments/assets/117c9104-9dd4-48fb-8e58-c0ee747ed529" />
+
 
 ---
 
