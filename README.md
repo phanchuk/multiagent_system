@@ -45,11 +45,11 @@ The goal of this project was to design and orchestrate a reusable multi-agent re
 * OpenAI GPT-4.1 Mini
 * Google Gemini 2.5 Flash Lite
 * Brave Search API
-* ScrapingAnt API
 * Google Drive API
 * Markdown → PDF conversion
 * JSON structured outputs
 * JavaScript transformation nodes
+* Hostinger (hosting, Docker)
 
 ---
 
