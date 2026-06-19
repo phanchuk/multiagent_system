@@ -1,0 +1,1520 @@
+{
+  "name": "[Multi-Agent] Research System Export",
+  "nodes": [
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ \"Lead_\" + $execution.id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1520,
+        384
+      ],
+      "id": "81c438fb-8035-4892-be88-43cede28f4fe",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Query', ``, 'string') }}",
+        "count": 12,
+        "additionalParameters": {}
+      },
+      "type": "@brave/n8n-nodes-brave-search.braveSearchTool",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        1040
+      ],
+      "id": "cf99ecdd-02ef-4e7a-93d0-e644c2619174",
+      "name": "Brave Search",
+      "credentials": {
+        "braveSearchApi": {
+          "id": "6pkeZCRnmw6X5xC9",
+          "name": "Brave Search account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "Research",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "8b79c01b-be3b-4fc3-972f-06a61836b099"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Research"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "74b72765-231b-4d95-b137-596eaae31a4c",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "Fetch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Fetch"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1088,
+        1104
+      ],
+      "id": "86432194-85ba-40f1-92c5-475f93b022db",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## Role\n\nYou're a researcher working on a specific research RESEARCH_TOPIC, that is part of the larger research RESEARCH_CONTEXT.\n\n## Objective\n\nYour objective is to note and organize findings and insights related to RESEARCH_TOPIC that will support RESEARCH_CONTEXT.\n\n## Process\n\nThink step-by-step. Given the RESEARCH_CONTEXT and RESEARCH_TOPIC:\n\n### Step 1\nUse Brave search to identify urls of websites to scrap.\n\n### Step 2\nGet summaries of 3-10 (3 for simple topics, 10 for complex topics) of those websites using web scrapping tool.\n\n### Step 3\nAnalyze the results achieved so far\n- Do you have enough information to achieve your objective?\n- If not, what would you improve? \n- If needed, repeat Steps 1-3 to fetch additional websites. In particular, you can use different Brave request.\n\n### Step 4\nPrepare the final report: \n- Structure your response in a logical way.\n- Include INLINE LINKS to specific URLs using URL domains as text and URL as href. \n- Use markdown formatting (respect H4, H5; only {x} are variables):\n\nH4 {{ $json.researchTopic }}\n{Your main points H5, occasionally H6 with their content. You can use bullet points, inline links, and tables.}\n\n## Important\n\n- Prioritize quality research over summarization.\n- Do not skip interesting, important, or surprising facts related to RESEARCH_TOPIC.\n- Do not skip data critical for RESEARCH_TOPIC.\n- Do not summarize things unrelated to RESEARCH_TOPIC that will likely by covered by other researchers. For example, do not explain what is product discovery, when your RESEARCH_TOPIC is product discovery tools.\n\n## RESEARCH_CONTEXT \n{{ $json.context }}\n\n## RESEARCH_TOPIC\n{{ $json.researchTopic }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        848
+      ],
+      "id": "705b7861-b1bf-46b2-b06e-5c174ad87918",
+      "name": "Search Subagent",
+      "retryOnFail": false,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## Role\nYou're a Copywriter Agent that prepares the final version of the research report.\n\n## Objective\nBased on the RESEARCH_NOTES_AND_FINDINGS in response to USER_REQUEST prepare a detailed final report. Add your general knowledge, e.g., to explain the terms or give examples, when you are sure you can do it.\n\nSuccess criteria:\n- The report is structured in a logical way\n- The report is as detailed as possible\n- The report is not laconic. Add intro before bullet points and explain terms when required.\n- The report includes the links to relevant URLs form from RESEARCH_NOTES_AND_FINDINGS. Make sure all links are present.\n\n## Process\nThink step by step:\n\n### Step 1\nCame up with the table of content: Research Title and Key Points to discuss (make sure you have data for them). The first Key Point is always an Executive Summary. Remember this table of content in memory.\n\n### Step 2\nPrepare the response (output). IMPORTANT:\n- Do not include the table of content from Step 1.\n- Do not include thinking steps.\n\n#### Expected response (output) format\n\n{\n\t\"reportFileName\": \"{Suggest report file name here without extension}\",\n\t\"reportContent\": \"{Place the markdown}\"\n}\n\nFor the reportContent mentioned above, use markdown formatting, based on this structure:\n\nH2 {Research title}\nH3 1. Executive Summary\n{Executive summary content}\nH3 2. {Key Point 2 Title}\n{Key point 2 content}\nH3 3. {Key Point 3 Title}\n{Key Point 3 content}\n...\nH3 N. {Key Point N Title}\n{Key Point N content}\n\nYou can use:\n- H4 points\n- Bullet points (inside H3 and H4)\n- Tables (inside H3 and H4, preferred at least one table in the report)\n- INLINE links (inside H3 and H4) either for each key point or close to key facts and numbers\n\n##### reportContent example (use markdown format)\n(H2) Product Management 101: Foundations, Skills, Methodologies, Tools, and Best Practices\n(H3) 1. Executive Summary\n(...)\n(H3) 2. Introduction to Product Management\n(...)\n(H4) 3. What is Product Manager\n(...)\n(H4) 4. PM ac the CEO of the Product\n(...)\n(H3) 5. Key Skills and Competencies for Product Managers\n(...)\n\n### Step 3\nAnalyze the results achieved so far and reflect:\n- How confident you are you've achieved your objective?\n- Is the formatting correct?\n- What else would you improve?\n\nNext:\n- If you are satisfied with your work or you've iterated > 5 times, respond according to the expected response (output) format\n- Else improve the response and execute step 3 again.\n\n## USER_REQUEST\n{{ $('Intent Clarification Agent').item.json.output.question }}\n\n## RESEARCH_NOTES_AND_FINDINGS\n{{ $json.output }}\n\n",
+        "hasOutputParser": true,
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        160
+      ],
+      "id": "0235f5e2-4071-4359-98a6-69f683a4db5f",
+      "name": "Copywriter Agent"
+    },
+    {
+      "parameters": {
+        "description": "[Search Subagent] Use this tool to call a Search Subagent. It will search the web based its parameters and return a summary.\n\nImportant: \n- You can call use this tool multiple times in parallel.\n- Call this tool multiple times in parallel, max 5 subagents at once, to reach the required total number of sub-agents (e.g., 2 * 5 agents to reach 10 agents)",
+        "workflowId": {
+          "__rl": true,
+          "value": "H74SjlF3yGct0pEY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/H74SjlF3yGct0pEY",
+          "cachedResultName": "[Multi-Agent] Research System Export"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "context": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('context', `RESEARCH_CONTEXT - the overall research scope, e.g., OpenAI Business Model.`, 'string') }}",
+            "researchTopic": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('researchTopic', `Research tasks for a Search Subagent, e.g., OpenAI Value Proposition.`, 'string') }}",
+            "type": "Research"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "researchTopic",
+              "displayName": "researchTopic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1664,
+        384
+      ],
+      "id": "25f36ff0-6e82-4374-aca7-4b5a98fa30d5",
+      "name": "Call Search Subagent"
+    },
+    {
+      "parameters": {
+        "description": "[Scrapper] Use this tool to scrap the content of a selected website by website url.\n\nIt will reply with a summary in this format (example):\n\n#### Execution ID: 981\n##### Page title: 7 Tools and Technologies\n##### Page URL: https://www.getcustomeriq.com/blog##### Key findings\nLorem ipsum (...)\n\nImportant: You can call use this tool multiple times in parallel.",
+        "workflowId": {
+          "__rl": true,
+          "value": "H74SjlF3yGct0pEY",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/H74SjlF3yGct0pEY",
+          "cachedResultName": "[Multi-Agent] Research System Export"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('url', ``, 'string') }}",
+            "context": "={{ $('Switch').item.json.context }}",
+            "researchTopic": "={{ $('Switch').item.json.researchTopic }}",
+            "type": "Fetch"
+          },
+          "matchingColumns": [
+            "url"
+          ],
+          "schema": [
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "researchTopic",
+              "displayName": "researchTopic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1664,
+        1040
+      ],
+      "id": "fa93920c-0ec3-4fd8-b07d-581535a27a9d",
+      "name": "Fetch website",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "type"
+            },
+            {
+              "name": "context"
+            },
+            {
+              "name": "researchTopic"
+            },
+            {
+              "name": "url"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        1088,
+        848
+      ],
+      "id": "09072c98-e099-472c-8d56-c6c6dd1f1d24",
+      "name": "Subworkflows"
+    },
+    {
+      "parameters": {
+        "content": "## Workflow Tool: Fetch a Website\n\nThe workflow:\n- Fetches a specific website (html)\n- Extracts findings, insights, etc. aligned with research context\n- Replies with markdown",
+        "height": 480,
+        "width": 680,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2000,
+        672
+      ],
+      "typeVersion": 1,
+      "id": "a2a4bfd3-ddd9-4b9e-8e2d-165d593d0d7f",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Search Subagent\n\nThe agent:\n- Uses Brave Search API to get a list of 12 search results\n- Selects 3-10 websites to analyze by the tool that extracts learnings\n- Then, the agent reflects on the progress and repeats the process, if needed\n- Finally, the agent combines all findings and returns them to the Lead Agent",
+        "height": 540,
+        "width": 680,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        640
+      ],
+      "typeVersion": 1,
+      "id": "a70995cb-9f1c-41f0-82e4-ef82b029b280",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Lead Orchestrator Agent\n\nThis agent analyzes the research intent and plans the work for Search Subagents, who work in parallel. Its goal is to prepare insights, findings, and learnings for a Copywriter Agent. It can reflect on the progress and continue to meet that objective. ",
+        "height": 580,
+        "width": 680,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1280,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "4143d5d9-6255-4cff-9cd2-906240865181",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Copywriter Agent\n\nThe agent:\n- Prepares the final report by creating a well-organized, detailed, consistent document. \n- It can reflect on the progress and repeat the edits.\n- It uses MarkdownMaster API (from rapodapi.com) to convert markdown to PDF.",
+        "height": 580,
+        "width": 1300,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2048,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "8cefe9ef-5410-45f3-953a-a7707e8ad7dd",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "975105f1-e6a3-4c60-b54f-85fbee1f1a96",
+              "leftValue": "={{ $json.output.responseType }}",
+              "rightValue": "=Question",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        784,
+        160
+      ],
+      "id": "56b3d3ad-631f-46b3-b61a-c2ea5d66cd6b",
+      "name": "Questions?"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"output\": \n  {\n    \"responseType\": \"Question\",\n    \"question\": \"Could you clarify which aspects...?\"\n  }\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        368
+      ],
+      "id": "3de4619e-ad4d-47ce-9eb6-4d3128e0606e",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ \"CSP_\" + $execution.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        448,
+        368
+      ],
+      "id": "f77d8333-f297-404a-8269-365426bc9110",
+      "name": "Simple Memory1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8cbf24ae-5e2b-43e5-b501-b0ae14ae5054",
+              "name": "Research area",
+              "value": "={{ $json[\"Your response\"] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        112,
+        352
+      ],
+      "id": "bee5bdf1-a88f-4890-b73b-4f829c060f27",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "content": "## User Intent Clarification Agent\n\nThe goal the agent is to clarify user request and formulate a clear research scope.\nAfter clarification, the user gets the destination URL where the end report will be stored.",
+        "height": 580,
+        "width": 1220,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1,
+      "id": "7ca07f0b-6de7-4f8d-885f-b3c3578762a0",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "formTitle": "Deep Research",
+        "formDescription": "What area would you like to research?",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Research area",
+              "fieldType": "textarea",
+              "placeholder": "e.g., For example, Compare the economies of the U.S. and France.",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "Submit"
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        112,
+        160
+      ],
+      "id": "c1d94ddb-6ade-48f0-adfa-3cf4da0b0f91",
+      "name": "Submit research",
+      "webhookId": "f3143dbb-eab4-4aec-87f6-ff54f58ab4a5"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Your response",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "We Need More Information",
+          "formDescription": "={{ $json.output.question }}"
+        }
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        352
+      ],
+      "id": "c97c85c9-f963-4d33-a6ca-d0f01ceb4670",
+      "name": "Ask a clarifying question",
+      "webhookId": "fb268db8-128f-413c-a6ab-aaaee2bbffb1",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"output\": {\n\t\"reportFileName\": \"Product Discovery 101\",\n\t\"reportContent\": \"HTML lorem ipsum\"\n}}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2400,
+        368
+      ],
+      "id": "e9ef0237-2d19-449f-b3a8-474527971c33",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "We're Generating Your Report",
+        "completionMessage": "=Your report will be available here:\nhttps://drive.google.com/drive/folders/1dIhUxvu9YQNw-LkDyCMlN2yUcMoj6sdA",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        160
+      ],
+      "id": "b58c9040-f731-4bf5-baca-6c9294b7d6ce",
+      "name": "Confirm the report is being generated",
+      "webhookId": "f4b84ba1-1213-4405-8175-be4f27538ab4"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Copywriter Agent').item.json.output.reportFileName }}.pdf",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1aALnFN4yHv7DKnoAWHOr79APTsNbsyma",
+          "mode": "list",
+          "cachedResultName": "Research_by_n8n",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1aALnFN4yHv7DKnoAWHOr79APTsNbsyma"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        3168,
+        320
+      ],
+      "id": "d4d14131-4c37-4d9c-a235-2eb45dac1784",
+      "name": "Google Drive",
+      "retryOnFail": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "LNdtobrUBSydjANU",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://markdownmaster.p.rapidapi.com/convert/md-to-pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-rapidapi-key",
+              "value": "484964de78msh92e315b55534347p1e614fjsn6ebbf1d64c1f"
+            },
+            {
+              "name": "x-rapidapi-host",
+              "value": "markdownmaster.p.rapidapi.com"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "markdown_text",
+              "value": "={{ $('Copywriter Agent').item.json.output.reportContent }}"
+            },
+            {
+              "name": "style",
+              "value": "github"
+            },
+            {
+              "name": "include_toc",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3728,
+        112
+      ],
+      "id": "b223cbd0-b68c-4050-8b21-7702dbd0116c",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "url": "https://scrapingant.p.rapidapi.com/get",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.url }}"
+            },
+            {
+              "name": "return_text",
+              "value": "true"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-rapidapi-key",
+              "value": "484964de78msh92e315b55534347p1e614fjsn6ebbf1d64c1f"
+            },
+            {
+              "name": "x-rapidapi-host",
+              "value": "scrapingant.p.rapidapi.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2112,
+        848
+      ],
+      "id": "a3ead0b3-55df-4cfa-b800-556f0411d408",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "content": "## ScrapingAnt (current API)\n\n### Cost per 1,000 user requests / month:\n\n**Brave API**: 5 agents * 1K req * $3/1K req = **$15.00**\n**ScrapingAnt**: 1K * 5 agents * 10 req * $9/5K req = **$90.00**\n**Markdown Master***: **10$** (up to 50K documents)\n#### Total: $115.00 / month\n##### *Each 100 requests: $11.50*\n\n### Cost per 100,000 user requests / month:\n\n**Brave API**: 5 agents * 100K req * $3/1K req = **$1,500.00**\n**ScrapingAnt**: 100K * 5 ag. * 10 req * $0.001/req = **$5,000**\n**Markdown Master***: **$30** (up to 200K documents)\n#### Total: $6,530 / month\n##### *Each 100 requests: $6.53*",
+        "height": 440,
+        "width": 440
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3232,
+        736
+      ],
+      "typeVersion": 1,
+      "id": "edf59a16-5281-47fe-91ff-5008f60b0555",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## scraperapi (scraperapi.com)\n\n### Cost per 1,000 user requests / month:\n\n**Brave API**: 5 agents * 1K req * $3/1K req = **$15.00**\n**scraperapi**: **$49.00** (up to 100K requests)\n**Markdown Master***: **10$** (up to 50K documents)\n#### Total: $74.00 / month\n##### *Each 100 requests: $7.40*\n\n### Cost per 100,000 user requests / month:\n\n**Brave API**: 5 agents * 100K req * $3/1K req = **$1,500.00**\n**scraperapi**: **$475.00** (up to 5M requests)\n**Markdown Master***: **$30** (up to 200K documents)\n#### Total: $2,050 / month\n##### *Each 100 requests: $2.01*",
+        "height": 440,
+        "width": 420
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3712,
+        736
+      ],
+      "typeVersion": 1,
+      "id": "449d6a38-ba0c-4be7-a301-c05bd395aa4a",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "## API Cost Estimation",
+        "height": 80,
+        "width": 900,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3232,
+        624
+      ],
+      "typeVersion": 1,
+      "id": "c89125de-c7b7-4e55-a031-2d20d1d43981",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        560,
+        368
+      ],
+      "id": "477a5f1a-a524-403e-8002-8505abea373b",
+      "name": "Think1"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        384
+      ],
+      "id": "a533f328-e379-4902-8b0c-981da48780a8",
+      "name": "Think2"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        1040
+      ],
+      "id": "f517df39-9adf-4c0f-a538-89a24f59cbc4",
+      "name": "Think3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You're a researcher working on a specific research RESEARCH_TOPIC, that is part of the larger research RESEARCH_CONTEXT.\n\nCreate detailed notes (learnings) based on WEBSITE_CONTENT using Markdown formatting in the following format (respect H4, H5; only {x} are variables):\n\n#### Execution ID: {{ $execution.id }}\n##### Page title: {Page title}\n##### Page URL: {{ $('Subworkflows').item.json.url }}\n##### Key findings\n{Notes, facts, data, insights. You can use bullet points and tables (the latter are preferred).}\n\n## Important\n\n- Prioritize quality research over being concise.\n- Do not skip interesting, important, or surprising facts related to RESEARCH_TOPIC.\n- Do not skip data critical for RESEARCH_TOPIC.\n- Do not include things unrelated to RESEARCH_TOPIC that will likely by covered by other researchers. For example, do not explain what is product discovery, when your research topic is product discovery tools.\n\n## RESEARCH_CONTEXT\n{{ $('Subworkflows').item.json.context }}\n\n## RESEARCH_TOPIC\n{{ $('Subworkflows').item.json.researchTopic }}\n\n## WEBSITE_CONTENT\n{{ $json.data }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        2272,
+        848
+      ],
+      "id": "a5725536-4c89-4418-a5df-252b87bc7081",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "content": "## LLM Cost Estimation (not optimized)",
+        "height": 80,
+        "width": 900,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3232,
+        1216
+      ],
+      "typeVersion": 1,
+      "id": "1e31f7fd-ba20-4e78-a6bc-0ff9cc2c034b",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        368
+      ],
+      "id": "8a0e436c-eed8-4b40-ae5e-1fdc3ebf7982",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        992
+      ],
+      "id": "ef2e825b-dc93-4ffd-8111-f717e3124c3d",
+      "name": "Gemini 2.5 Flash Little",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4.1",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        304,
+        368
+      ],
+      "id": "3b9d82b4-5e82-47e7-9e26-65aeec68cfe4",
+      "name": "GPT-4.1 (1)",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        672,
+        464
+      ],
+      "id": "a5f514fe-0177-49fb-83a7-c3f4bd073516",
+      "name": "GPT-4.1 Mini (1)",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4.1",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        384
+      ],
+      "id": "39b86620-011f-40b6-a50b-414a2fbd41bd",
+      "name": "GPT-4.1 (2)",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4.1",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        1040
+      ],
+      "id": "1997ed0a-b367-4a27-8dc1-ad30fb904396",
+      "name": "GPT-4.1 (3)",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-4.1",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        368
+      ],
+      "id": "b0244423-7fcc-42e2-be98-178498623933",
+      "name": "GPT 4.1 (4)",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        464
+      ],
+      "id": "9d60b652-1646-4833-a282-12468db0f440",
+      "name": "GPT-4.1 Mini (2)",
+      "credentials": {
+        "openRouterApi": {
+          "id": "C30mAA5hBzN4m9Be",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Presented GPT-4.1\n\n#### Cost by model:\n- GPT-4.1: $1.052 / request\n- GPT-4.1 Mini: $0.082 / request\n- Gemini Flash 2.5 Little: $0.079 / request\n\n### Total: $1.21 / request\n### Total: $121 / 100 requests\n",
+        "height": 380,
+        "width": 760
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3232,
+        1312
+      ],
+      "typeVersion": 1,
+      "id": "a7dfa9b7-ec65-4112-8684-c11005bc36e5",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "content": "## If Gemini Flash 2.5 Little: \n\n#### Differences:\n- 5% cost compared to 4.1\n- 25% cost compared to 4.1-Mini\n\n#### New costs:\n- $0.053 / request\n- $0.021 / request\n- $0.079 / request\n\n### Total: $0.15 / request\n### Total: $15 / 100 requests\n",
+        "height": 380,
+        "width": 420
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3712,
+        1312
+      ],
+      "typeVersion": 1,
+      "id": "24e62dd6-0b3a-42b2-b434-872dc63c2d1b",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## Role\nYou're a Lead Orchestrator Agent planning research tasks for Search Subagents. \n\n## Objective\nYour goal is to collect all the information required to prepare a detailed research report based on USER_REQUEST. The final report will be created by another Copywriter Subagent.\n\n## Process\nThink step by step:\n\n### Step 1\n\nBased on USER_REQUEST, define RESEARCH_CONTEXT - the overall research scope you will communicate to subagents.\n\nExample:\nIf the original user request was \"I'd like to understand OpenAI Business Model, can you help me with the research,\" you could define RESEARCH_CONTEXT as \"OpenAI Business Model.\"\n\n### Step 2\nCreate a list of 2–4 unique research tasks for Search Subagents:\n– For simple topics, lean toward 2\n– For complex topics, lean toward 4\n\nExample:\n- OpenAI Vision and Mission\n- OpenAI Value Proposition\n- OpenAI Competitors\n(...)\n- OpenAI News 2025\n\n### Step 3\nCall Search Subagents using RESEARCH_CONTEXT and research tasks from the previous step. Each of the subagents will search the web based its parameters and return a summary.\n\n### Step 4\nAnalyze the results achieved so far and reflect:\n- Have you achieved your objective?\n- Do you have enough information?\n- What would you improve?\n\nNext:\n- If you are satisfied with your work, go to Step 5\n- Else if total number of Search Subagents calls > 20, go to Step 5\n- Else repeat the process from Step 2 to collect additional information\n\n### Step 5\n\nRespond by combining responses from all agents 1:1 in the form of:\n\n<research title=\"RESEARCH_CONTEXT\">\n  <area=\"{Research task for Search Subagent 1}\">\n    {Full research results from Search Subagent 1}\n  </area>\n  <area=\"{Research task for Search Subagent 2}\">\n    {Full research results from Search Subagent 2}\n  </area>\n(...)\n  <area=\"{Research task for Search Subagent N}\">\n    {Full research results from Search Subagent N}\n  </area>\n</research>\n\nIMPORTANT: \n- Do not remove or simplify any information provided by Search Subagents!\n- Maintain links provided by Search Subagents!\n\n## USER_REQUEST\n{{ $('Intent Clarification Agent').item.json.output.question }}",
+        "options": {
+          "returnIntermediateSteps": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        160
+      ],
+      "id": "8c6fe9ef-53cb-4b32-9be6-bd4084e64422",
+      "name": "Lead Orchestrator Agent"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## USER_REQUEST OR ADDITIONAL INFO\n{{ $json[\"Research area\"] }}\n",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "## Role\nYou're validating USER_REQUEST before starting a deep research. \n\n## Objective\nYour goal is to ensure the research scope requested by the user is clear. Next, you will handle the request to the Lead Agent who will orchestrate performing the research.\n\n## Response format\nReply with a JSON:\n\nAttribute 1: responseType, required\nPossible values of responseType: \n- \"Question\" - Clarifying question to the user\n- \"Research\" - Confirmation we can start the research\n\nAttribute 2: text, required\nIn case you have questions, put your question here. Otherwise use a clarified recent research scope here (or the oryginal research scope, if no clarifications were needed).\n\n## Example responses\n\nExample 1:\n{\"output\": \n{ \n  \"responseType\": \"Question\",  \n  \"question\": \"You haven't specified the time range...?\"\n}}\n\nExample 2:\n{output { \n  \"responseType\": \"Research\",  \n  \"question\": \"Analyze MSTF performance between 2024 and 2025\"\n}}\n\n## Important\n\nBoth attributes are required. Do not add anything else to the response.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        384,
+        160
+      ],
+      "id": "c7e00955-8962-423e-b04f-d777c39c539c",
+      "name": "Intent Clarification Agent"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "83d8a2ae-613f-479a-a13c-1a513a5e4048",
+              "name": "html",
+              "value": "={{\n`<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>\nbody {\n    font-family: Arial, sans-serif;\n    margin: 40px;\n    line-height: 1.6;\n}\ntable {\n    border-collapse: collapse;\n    width: 100%;\n}\nth, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n}\nth {\n    background: #f3f3f3;\n}\npre {\n    white-space: pre-wrap;\n}\n</style>\n</head>\n<body>\n<pre>${$json.output.reportContent}</pre>\n</body>\n</html>`\n}}",
+              "type": "string"
+            },
+            {
+              "id": "5b08d1e8-c42c-4c25-91c7-bdec9f6cd9bf",
+              "name": "filename",
+              "value": "={{$json.output.reportFileName + '.pdf'}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2640,
+        160
+      ],
+      "id": "b14aab2a-4d2e-437b-b9bc-f4a3036d56d6",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const html = $json.html;\nconst fileName = 'index.html';\n\nconst binaryData = Buffer.from(html).toString('base64');\n\nreturn {\n  json: {\n    filename: $json.filename,\n  },\n  binary: {\n    data: {\n      data: binaryData,\n      mimeType: 'text/html',\n      fileName: fileName,\n    },\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        160
+      ],
+      "id": "4c8efa6b-3025-4864-baee-275308d763fc",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pdf-service:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdf"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2992,
+        272
+      ],
+      "id": "978f775d-9886-4164-9d46-8d6334965ea3",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const markdown = $json.output.reportContent;\n\nfunction mdToHtml(md) {\n  return md\n    .replace(/^### (.*)$/gm, '<h3>$1</h3>')\n    .replace(/^## (.*)$/gm, '<h2>$1</h2>')\n    .replace(/^# (.*)$/gm, '<h1>$1</h1>')\n    .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')\n    .replace(/^- (.*)$/gm, '<li>$1</li>')\n    .replace(/\\n/g, '<br>');\n}\n\nreturn {\n  json: {\n    ...$json,\n    htmlContent: mdToHtml(markdown),\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2496,
+        160
+      ],
+      "id": "0b97dfcd-0f6b-46f5-8225-0848abed1a75",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {
+    "Edit Fields": [
+      {
+        "json": {
+          "html": "=<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<style>\nbody {\n    font-family: Arial, sans-serif;\n    margin: 40px;\n    line-height: 1.6;\n}\ntable {\n    border-collapse: collapse;\n    width: 100%;\n}\nth, td {\n    border: 1px solid #ccc;\n    padding: 8px;\n}\nth {\n    background: #f3f3f3;\n}\npre {\n    white-space: pre-wrap;\n}\n</style>\n</head>\n<body>\n<pre>\n## Financial Comparison of AWS and Azure (2024–2025)\n\n### 1. Executive Summary\nAmazon Web Services (AWS) and Microsoft Azure are the two dominant cloud infrastructure providers globally, together accounting for over half the worldwide market share and serving as critical drivers of technological innovation and enterprise transformation. This report compares the most recent financial indicators for both platforms—revenue volume, market share, growth rates, and strategic factors influencing their market position—using data through mid-2025. AWS retains the global lead in both revenue and market share, but Azure is growing at a significantly faster pace, largely fueled by its enterprise integration, aggressive AI investments, and hybrid cloud dominance. Both companies are reshaping the cloud landscape amid rapid AI adoption, shifting enterprise preferences, and escalating capital expenditures.\n\n### 2. AWS Financial Indicators: Revenue, Market Share, and Growth Trends\nAWS has entrenched its status as cloud market leader through robust growth, profitability, and vast global infrastructure. Key financial indicators include:\n\n#### Revenue and Growth Trends\n- **Quarterly Revenue (Q4 2025):** $35.58B, a 23.6% YoY growth ([ycharts.com](https://ycharts.com/indicators/the_amazoncom_inc_amzn_aws_revenue_quarterly)).\n- **Annual Revenue (FY2024):** $107–$115B ([esparkinfo.com](https://www.esparkinfo.com/aws/statistics), [businesstats.com](https://businesstats.com/amazon-statistics-facts/)), surpassing $116B as of June 2025 ([businessinsider.com](https://www.businessinsider.com/microsoft-amazon-aws-azure-compare-cloud-giants-2025-7)).\n- **Growth Rate:** 17–19% YoY in 2024; growth re-accelerated after a brief post-pandemic slowdown.\n- **Operating Margin:** 38–44% (Q1–Q3 2024), at record highs ([businesstats.com](https://businesstats.com/amazon-statistics-facts/)).\n\n#### Market Share and Position\n- **Global Cloud Infrastructure Market Share (2024–2025):** 30–33%, number one globally ([holori.com](https://holori.com/cloud-market-share-2024-aws-azure-gcp/)).\n- **Customer Base:** Over 4.2 million business customers as of 2025, with particularly rapid expansion in startups and SMBs (+28% YoY) ([hginsights.com](https://hginsights.com/blog/aws-market-report-buyer-landscape/)).\n- **Geographic Reach:** Largest footprint in North America (~56%), but fast expansion in APAC, EMEA, and LATAM ([hginsights.com](https://hginsights.com/blog/aws-market-report-buyer-landscape/)).\n\n#### Growth Drivers\n- **AI & Generative AI:** Major capital investments ($75B+ in 2024, projected >$100B in 2025) support infrastructure and AI—e.g., $4B Anthropic investment ([fifthperson.com](https://fifthperson.com/amazon-q3-2024-earnings-call/)).\n- **Enterprise Penetration:** Over 85% of enterprises and 90%+ of Fortune 100 companies are AWS customers ([esparkinfo.com](https://www.esparkinfo.com/aws/statistics)).\n- **Profit Engine:** AWS contributes 60%+ of Amazon's total operating profit, despite being 15–19% of total revenue ([highradius.com](https://www.highradius.com/finsider/amazon-revenue-breakdown/)).\n\n#### AWS Revenue Table (Selected Periods)\n| Quarter    | Revenue (USD B) | YoY Growth |\n|------------|-----------------|------------|\n| Q4 2025    | 35.58           | +23.6%     |\n| Q4 2024    | 28.79           | +19%       |\n| Q1 2024    | 25.04           | +17%       |\n| Q4 2023    | 24.20           | -          |\n\n*See full data and references: [ycharts.com](https://ycharts.com/indicators/the_amazoncom_inc_amzn_aws_revenue_quarterly), [fifthperson.com](https://fifthperson.com/amazon-q3-2024-earnings-call/)*\n\n**References:**\n- [esparkinfo.com](https://www.esparkinfo.com/aws/statistics), [businesstats.com](https://businesstats.com/amazon-statistics-facts/), [datacentremagazine.com](https://datacentremagazine.com/hyperscale/aws-remains-330bn-cloud-market-leader-driven-by-ai-growth/), [holori.com](https://holori.com/cloud-market-share-2024-aws-azure-gcp/)\n\n### 3. Azure Financial Indicators: Revenue, Market Share, and Growth Trends\nAzure is experiencing notable acceleration, outpacing AWS in growth rate, thanks in part to AI and enterprise cloud demand.\n\n#### Revenue and Growth Trends\n- **Azure Segment Revenue (June 2024):** ~$62B ([Forbes.com](https://www.forbes.com/sites/bethkindig/2024/09/05/prediction-microsoft-azure-to-reach-200-billion-in-revenue-by-2028/)), with full year (FY ending June 2025) surpassing **$75B** ([businessinsider.com](https://www.businessinsider.com/microsoft-amazon-aws-azure-compare-cloud-giants-2025-7)).\n- **Intelligent Cloud Segment (2023):** $96.2B (includes Azure, plus other cloud assets) ([hginsights.com](https://hginsights.com/blog/microsoft-azure-market-share-report/)).\n- **Quarterly Growth Rate:** Typically 30–35% YoY in 2024–2025, much higher than AWS’s 17–19% ([turbo360.com](https://turbo360.com/blog/azure-market-share)).\n\n#### Market Share and Position\n- **Market Share:** 20–25%, solid #2 globally ([holori.com](https://holori.com/cloud-market-share-2024-aws-azure-gcp/)), [turbo360.com](https://turbo360.com/blog/azure-market-share)).\n- **Customer Base:** 350,000–486,000 organizations, with 85%+ of Fortune 500 using Azure ([hginsights.com](https://hginsights.com/blog/microsoft-azure-market-share-report/)).\n- **Regional Strength:** EMEA and North America both feature 130,000+ customers ([hginsights.com](https://hginsights.com/blog/microsoft-azure-market-share-report/)).\n- **AI Revenue:** AI annual run rate reached ~$13B, growing 175% YoY and accounting for 9–11% of Azure’s revenue ([turbo360.com](https://turbo360.com/blog/azure-market-share), [electroiq.com](https://electroiq.com/stats/microsoft-azure-statistics/)).\n\n#### Strategic Highlights\n- **AI Focus:** Microsoft’s $13B investment in OpenAI has made Azure the leading cloud for generative AI workloads ([forbes.com](https://www.forbes.com/sites/bethkindig/2024/09/05/prediction-microsoft-azure-to-reach-200-billion-in-revenue-by-2028/)).\n- **Capital Expenditure:** $55.7B in FY2024 (+75% YoY), with $19B in Q4 alone—primarily directed to data center and AI infrastructure ([forbes.com](https://www.forbes.com/sites/bethkindig/2024/09/05/prediction-microsoft-azure-to-reach-200-billion-in-revenue-by-2028/)).\n- **Hybrid Cloud Dominance:** Azure Arc and hybrid initiatives underpin deep enterprise adoption.\n\n#### Azure Key Indicators Table\n| Indicator                | Value/Status          | Source  |\n|--------------------------|----------------------|---------|\n| Revenue (FY 2024 est.)   | ~$75B                | [businessinsider.com](https://www.businessinsider.com/microsoft-amazon-aws-azure-compare-cloud-giants-2025-7) |\n| Growth Rate              | 30–35%               | [turbo360.com](https://turbo360.com/blog/azure-market-share) |\n| Market Share             | 20–25%               | [holori.com](https://holori.com/cloud-market-share-2024-aws-azure-gcp/) |\n| AI Revenue (2024)        | ~$13B (run rate)     | [turbo360.com](https://turbo360.com/blog/azure-market-share) |\n| Total Customers          | 350–486K             | [hginsights.com](https://hginsights.com/blog/microsoft-azure-market-share-report/) |\n\n### 4. AWS vs Azure: Direct Financial Statistics and Market Share Comparison\n\n#### Head-to-Head Financial Metrics Table\n|                      | AWS                | Azure                    |\n|----------------------|--------------------|--------------------------|\n| Market Share (2024–5)| 30–33%             | 20–25%                   |\n| Annual Revenue 2025  | $116.5B            | $75B+                    |\n| Growth Rate (2024)   | ~18%               | ~34%                     |\n| Q1 2024 Revenue      | $25B               | $26.7B                   |\n| Customer Base        | 4.2M+              | 350–486K                 |\n\n*Sources: [holori.com](https://holori.com/cloud-market-share-2024-aws-azure-gcp/), [businessinsider.com](https://www.businessinsider.com/microsoft-amazon-aws-azure-compare-cloud-giants-2025-7), [turbo360.com](https://turbo360.com/blog/aws-vs-azure)*\n\n#### Market and Strategic Insights\n- **AWS maintains global leadership** in absolute revenue and share, especially across all business sizes and sectors. Azure’s **growth rate outpaces AWS**, driven by enterprise contracts and an all-in AI push.\n- **AI is a pivotal factor**: Both companies are making large investments, but Azure’s exclusive partnership with OpenAI is helping it lead in AI-powered cloud workloads.\n- **Hybrid strategies and integration:** Azure’s seamless integration with Microsoft enterprise solutions provides unique advantages in regulated or hybrid environments.\n- **Customer base skew:** AWS leads in both total customer numbers and breadth. Azure’s focus is more on deep enterprise penetration and large corporate contracts.\n\n### 5. Recent Financial Shifts and Strategic Factors\nCloud market competition has intensified, catalyzed by enormous investments in AI infrastructure, new product launches, and evolving customer needs.\n\n#### Azure’s Acceleration and AI-Fueled Growth\n- **Q3 2025 Azure revenue up 35% YoY**, AWS slower at ~18% (and Google Cloud lower still) ([io-fund.com](https://io-fund.com/cloud-platforms/ai-platforms/microsoft-q3-2025-azure-vs-aws-vs-google)).\n- AI is the **primary growth driver**, with OpenAI APIs pushing billions in quarterly usage revenues ([io-fund.com](https://io-fund.com/cloud-platforms/ai-platforms/microsoft-q3-2025-azure-vs-aws-vs-google)).\n- **Hybrid and enterprise integrations** fuel Azure’s market expansion.\n- **Analyst consensus**: Azure could overtake AWS in revenue by 2026 if growth rates persist ([forbes.com](https://www.forbes.com/sites/petercohan/2024/02/13/why-microsoft-azure-could-take-the-cloud-lead-from-amazon-aws-by-2026/)).\n\n#### AWS’s Resilience and Adaptation\n- **Remains highly profitable and asset-intensive**, leading in global infrastructure coverage.\n- Recent **slower growth** compared to Azure, but maintains highest segment margins for Amazon.\n- Focused on massive AI/data-center investments to compete with Azure’s pace ([fifthperson.com](https://fifthperson.com/amazon-q3-2024-earnings-call/)).\n- Broadest customer appeal, product suite (250+ services), and reach.\n\n#### Market and Competitive Dynamics\n- **Hybrid and AI are major battlegrounds:** Microsoft’s Office, Windows, and AI stack tightly integrate with Azure; AWS responds with Anthropic, Nvidia collaborations, and proprietary AI advancements.\n- **Enterprise focus** is giving Azure a competitive edge among large organizations, while AWS dominates in both enterprise and SMB/startup segments.\n\n#### Challenges and Emerging Trends\n- **Capacity/capex constraints:** Both are investing billions to meet surging AI and cloud workload demand (e.g., GPUs/data centers).\n- **Multi-cloud adoption:** Over 90% of enterprises run multi-cloud, sometimes diluting share and stickiness for both AWS and Azure ([turbo360.com](https://turbo360.com/blog/azure-market-share)).\n- **Mature market dynamics:** Growth will become costlier as the global cloud market approaches $400B by 2025 ([cargoson.com](https://www.cargoson.com/en/blog/global-cloud-infrastructure-market-share-aws-azure-google)).\n\n### 6. Sources and Further Reading\n- [AWS stats: esparkinfo.com](https://www.esparkinfo.com/aws/statistics), [businesstats.com](https://businesstats.com/amazon-statistics-facts/), [ycharts.com](https://ycharts.com/indicators/the_amazoncom_inc_amzn_aws_revenue_quarterly), [datacentremagazine.com](https://datacentremagazine.com/hyperscale/aws-remains-330bn-cloud-market-leader-driven-by-ai-growth/)\n- [Azure stats: forbes.com](https://www.forbes.com/sites/bethkindig/2024/09/05/prediction-microsoft-azure-to-reach-200-billion-in-revenue-by-2028/), [turbo360.com](https://turbo360.com/blog/azure-market-share), [holori.com](https://holori.com/cloud-market-share-2024-aws-azure-gcp/)\n- [Head-to-head: businessinsider.com](https://www.businessinsider.com/microsoft-amazon-aws-azure-compare-cloud-giants-2025-7), [trustedtechteam.com](https://www.trustedtechteam.com/blogs/azure/how-microsoft-azure-will-surpass-aws-in-2025), [io-fund.com](https://io-fund.com/cloud-platforms/ai-platforms/microsoft-q3-2025-azure-vs-aws-vs-google)\n\n---\n**Key takeaway:** AWS is still the top cloud provider by size and revenue, but Azure’s rapid growth—powered by enterprise adoption and AI innovation—continues to close the gap. The coming years, especially with continued AI and hybrid cloud demand, could see further shifts in leadership, making this a critical period for cloud market watchers.\n</pre>\n</body>\n</html>",
+          "filename": "AWS-vs-Azure-Financial-Comparison-2025.pdf"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Lead Orchestrator Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brave Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Search Subagent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Search Subagent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Search Subagent": {
+      "ai_tool": [
+        [
+          {
+            "node": "Lead Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch website": {
+      "ai_tool": [
+        [
+          {
+            "node": "Search Subagent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subworkflows": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Questions?": {
+      "main": [
+        [
+          {
+            "node": "Ask a clarifying question",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Confirm the report is being generated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Intent Clarification Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "Intent Clarification Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Intent Clarification Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Copywriter Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit research": {
+      "main": [
+        [
+          {
+            "node": "Intent Clarification Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask a clarifying question": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Copywriter Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm the report is being generated": {
+      "main": [
+        [
+          {
+            "node": "Lead Orchestrator Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        []
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think1": {
+      "ai_tool": [
+        [
+          {
+            "node": "Intent Clarification Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think2": {
+      "ai_tool": [
+        [
+          {
+            "node": "Lead Orchestrator Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think3": {
+      "ai_tool": [
+        [
+          {
+            "node": "Search Subagent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "Copywriter Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 2.5 Flash Little": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4.1 (1)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Intent Clarification Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4.1 Mini (1)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4.1 (2)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Lead Orchestrator Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4.1 (3)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Search Subagent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT 4.1 (4)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Copywriter Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GPT-4.1 Mini (2)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Orchestrator Agent": {
+      "main": [
+        [
+          {
+            "node": "Copywriter Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Clarification Agent": {
+      "main": [
+        [
+          {
+            "node": "Questions?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "097f54bf-bdf3-482d-9452-4eca243b6d76",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e9297840a9276622fc571cdeb8804b8d14b8ef599b5167cd238320b9e418f554"
+  },
+  "nodeGroups": [],
+  "id": "H74SjlF3yGct0pEY",
+  "tags": []
+}
